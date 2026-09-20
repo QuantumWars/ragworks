@@ -26,7 +26,7 @@ separates the two things that get conflated:
 
 | Path | Contents |
 |---|---|
-| [`lib/`](lib) | Rust workspace: `core`, `chunk`, `index`, `embed`, `py` |
+| [`lib/`](lib) | Rust workspace: `core`, `chunk`, `index`, `embed`, `read`, `py` |
 | [`r-d/`](r-d) | Research directory: harness, tasks, systems, findings |
 | [`CONFORMANCE.md`](CONFORMANCE.md) | Requirements R1–R47, derived from 20 published RAG systems |
 | [`r-d/CANDIDATES.md`](r-d/CANDIDATES.md) | Which systems are worth implementing, with cost and code-availability data |

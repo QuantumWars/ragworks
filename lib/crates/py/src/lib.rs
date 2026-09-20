@@ -63,7 +63,7 @@ fn json(obj: Option<&Bound<'_, PyAny>>) -> PyResult<serde_json::Value> {
 
 #[pyclass(module = "ragworks")]
 pub struct Corpus {
-    inner: ragworks_core::Corpus,
+    pub(crate) inner: ragworks_core::Corpus,
 }
 
 #[pymethods]
@@ -366,6 +366,50 @@ impl Flat {
     }
 }
 
+// --------------------------------------------------------------- readers
+
+/// Read one file, dispatching on its extension. Returns `{"text", "meta"}`.
+#[pyfunction]
+fn read_file(py: Python<'_>, path: &str) -> PyResult<Py<PyAny>> {
+    let readers = ragworks_read::Readers::standard().map_err(Error)?;
+    let x = readers.read_path(path).map_err(Error)?;
+    let out = serde_json::json!({"text": x.text, "meta": x.meta});
+    let loads = py.import("json")?.getattr("loads")?;
+    Ok(loads.call1((out.to_string(),))?.unbind())
+}
+
+/// Walk `dir` and add every readable file to `corpus`.
+///
+/// Files whose extension has no reader are sniffed and skipped if they look
+/// binary, so compiled artefacts do not enter the index as mojibake.
+#[pyfunction]
+#[pyo3(signature = (corpus, dir, max_bytes = 64 << 20, skip_hidden = true))]
+fn ingest(
+    py: Python<'_>,
+    corpus: &mut Corpus,
+    dir: &str,
+    max_bytes: usize,
+    skip_hidden: bool,
+) -> PyResult<Py<PyAny>> {
+    let readers = ragworks_read::Readers::standard().map_err(Error)?;
+    let opts = ragworks_read::IngestOptions {
+        max_bytes,
+        skip_hidden,
+        ..Default::default()
+    };
+    let stats = ragworks_read::ingest_dir(&mut corpus.inner, dir, &readers, &opts).map_err(Error)?;
+    let out = serde_json::json!({
+        "files": stats.files,
+        "skipped": stats.skipped,
+        "bytes": stats.bytes,
+        "errors": stats.errors.iter()
+            .map(|(p, e)| serde_json::json!([p.to_string_lossy(), e]))
+            .collect::<Vec<_>>(),
+    });
+    let loads = py.import("json")?.getattr("loads")?;
+    Ok(loads.call1((out.to_string(),))?.unbind())
+}
+
 // ---------------------------------------------------------------- module
 
 /// Reciprocal Rank Fusion over ranked runs of `(id, score)` pairs.
@@ -392,6 +436,7 @@ fn catalogue(py: Python<'_>) -> PyResult<Py<PyAny>> {
         "text_index": ragworks_index::text_registry().describe(),
         "vector_store": ragworks_index::vector_registry().describe(),
         "embedder": ragworks_embed::registry().describe(),
+        "reader": ragworks_read::registry().describe(),
     });
     let loads = py.import("json")?.getattr("loads")?;
     Ok(loads.call1((all.to_string(),))?.unbind())
@@ -408,6 +453,8 @@ fn ragworks(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Embedder>()?;
     m.add_class::<Flat>()?;
     m.add_function(wrap_pyfunction!(rrf, m)?)?;
+    m.add_function(wrap_pyfunction!(read_file, m)?)?;
+    m.add_function(wrap_pyfunction!(ingest, m)?)?;
     m.add_function(wrap_pyfunction!(catalogue, m)?)?;
     Ok(())
 }

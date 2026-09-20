@@ -1,0 +1,29 @@
+[package]
+name = "ragworks-read"
+description = "Readers: text, markdown, HTML, CSV, JSON, and optionally PDF."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+ragworks-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+csv.workspace = true
+encoding_rs.workspace = true
+html2text.workspace = true
+walkdir.workspace = true
+pdf-extract = { workspace = true, optional = true }
+
+[features]
+default = []
+# Pure-Rust PDF text extraction. Off by default: it pulls in a substantial
+# dependency tree and its output quality on multi-column or scanned documents
+# is markedly worse than a native library's.
+pdf = ["dep:pdf-extract"]
+
+[dev-dependencies]
+ragworks-chunk = { path = "../chunk" }
+ragworks-index = { path = "../index" }

@@ -14,10 +14,10 @@ a registry in front of it, so pipelines are configuration rather than code.
 | `ragworks-chunk` | `fixed`, `recursive`, `markdown` |
 | `ragworks-index` | `bm25`, `flat` dense, RRF fusion |
 | `ragworks-embed` | `hashing` (offline), `openai` (any compatible endpoint), with retry, rate limiting and cost accounting |
-| `ragworks-py` | PyO3 bindings, abi3 wheel — `Corpus`, `Chunker`, `Bm25`, `Flat`, `Embedder`, `rrf`, `catalogue` |
-| `ragworks-read` | not started |
+| `ragworks-read` | `text`, `markdown`, `html`, `csv`, `json`/`jsonl`, and `pdf` behind a feature; extension dispatch and directory ingestion |
+| `ragworks-py` | PyO3 bindings, abi3 wheel — `Corpus`, `Chunker`, `Bm25`, `Flat`, `Embedder`, `ingest`, `read_file`, `rrf`, `catalogue` |
 
-**75 tests, 0 clippy warnings.**
+**101 tests, 0 clippy warnings.**
 
 Against the Python BM25 in `r-d`, on 2,964 paragraphs and 300 queries:
 **100% top-1 agreement, 1.000 set overlap@10, 21.7× faster search, 3.2× faster
@@ -143,7 +143,28 @@ crates/embed/src/
   retry.rs  backoff driven by error classification
   limit.rs  client-side rate limiting
   http.rs   transport seam, mockable in tests
+crates/read/src/
+  text.rs markdown.rs html.rs tabular.rs json.rs
+  pdf.rs    behind the `pdf` feature
+  lib.rs    extension dispatch and directory ingestion
 ```
+
+## Reading a directory
+
+```rust
+let mut corpus = Corpus::new();
+let stats = ingest_dir(&mut corpus, "docs/", &Readers::standard()?, &Default::default())?;
+```
+
+Files with an unregistered extension fall back to the text reader, but are
+sniffed first and skipped if they look binary. Without that check, ingesting a
+real project pulled in compiled `.pyc` files as mojibake: 116 files and 1,596 KB
+of "text", of which over a megabyte was noise. With it, 69 files and 425 KB.
+
+PDF support is opt-in (`--features pdf`). It uses a pure-Rust extractor, so
+there is no system library to install and wheels stay a single file; a native
+engine such as PDFium extracts multi-column layouts and tables better, and can
+be dropped in by implementing `Reader` over it.
 
 ## The offline embedder
 

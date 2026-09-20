@@ -15,6 +15,9 @@ ragworks-core.workspace = true
 ragworks-chunk = { path = "../chunk" }
 ragworks-embed = { path = "../embed" }
 ragworks-index = { path = "../index" }
+# PDF is on for the Python wheel: it is pure Rust, so it costs binary size but
+# no system dependency, and a Python RAG user expects PDFs to work.
+ragworks-read = { path = "../read", features = ["pdf"] }
 serde_json.workspace = true
 pyo3 = { version = "0.29.2", features = ["abi3-py310"] }
 
