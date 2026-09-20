@@ -1,0 +1,14 @@
+[tool.ruff]
+line-length = 100
+src = ["."]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "PERF", "BLE"]
+ignore = [
+    "E501",    # long lines are fine in docstrings quoting a paper
+    "PERF203", # per-item try/except is the point: one bad query must not abort a run
+    "RUF001",  # en dashes are intentional in plot titles and prose
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
