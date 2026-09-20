@@ -950,10 +950,10 @@ name = "ragworks-embed"
 version = "0.1.0"
 dependencies = [
  "ragworks-core",
+ "ragworks-net",
  "schemars",
  "serde",
  "serde_json",
- "ureq",
 ]
 
 [[package]]
@@ -968,6 +968,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "ragworks-judge"
+version = "0.1.0"
+dependencies = [
+ "ragworks-core",
+ "ragworks-net",
+ "schemars",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "ragworks-net"
+version = "0.1.0"
+dependencies = [
+ "ragworks-core",
+ "schemars",
+ "serde",
+ "serde_json",
+ "ureq",
+]
+
+[[package]]
 name = "ragworks-py"
 version = "0.1.0"
 dependencies = [
@@ -976,6 +998,7 @@ dependencies = [
  "ragworks-core",
  "ragworks-embed",
  "ragworks-index",
+ "ragworks-judge",
  "ragworks-read",
  "serde_json",
 ]

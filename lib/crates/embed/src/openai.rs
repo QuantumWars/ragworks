@@ -14,9 +14,7 @@ use ragworks_core::{Component, Embedder, Error, Result};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
-use crate::http::{HttpPost, UreqClient};
-use crate::limit::RateLimiter;
-use crate::retry::RetryPolicy;
+use ragworks_net::{HttpPost, RateLimiter, RetryPolicy, UreqClient};
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

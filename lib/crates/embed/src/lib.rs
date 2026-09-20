@@ -6,16 +6,12 @@
 //! batching and cost accounting -- live here rather than in each caller.
 
 pub mod hash;
-pub mod http;
-pub mod limit;
 pub mod openai;
-pub mod retry;
 
 pub use hash::{Hashing, HashingConfig};
-pub use limit::RateLimiter;
 pub use openai::{OpenAiCompatible, OpenAiConfig, Usage};
 use ragworks_core::{Embedder, Registry};
-pub use retry::RetryPolicy;
+pub use ragworks_net::{RateLimiter, RetryPolicy};
 
 pub fn registry() -> Registry<dyn Embedder> {
     let mut r = Registry::<dyn Embedder>::new("embedder");
@@ -29,7 +25,7 @@ mod tests {
     use ragworks_core::Embedder;
 
     use super::*;
-    use crate::http::MockHttp;
+    use ragworks_net::MockHttp;
 
     // ------------------------------------------------------------- hashing
 

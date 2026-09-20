@@ -1,6 +1,6 @@
 [package]
-name = "ragworks-embed"
-description = "Embedders: OpenAI-compatible HTTP, and a deterministic offline hasher."
+name = "ragworks-net"
+description = "Shared provider plumbing: HTTP seam, retry policy, rate limiting."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +8,7 @@ license.workspace = true
 
 [dependencies]
 ragworks-core.workspace = true
-ragworks-net.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 schemars.workspace = true
+ureq.workspace = true
