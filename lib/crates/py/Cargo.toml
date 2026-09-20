@@ -1,0 +1,21 @@
+[package]
+name = "ragworks-py"
+description = "Python bindings for ragworks."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "ragworks"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ragworks-core.workspace = true
+ragworks-chunk = { path = "../chunk" }
+ragworks-index = { path = "../index" }
+serde_json.workspace = true
+pyo3 = { version = "0.29.2", features = ["abi3-py310"] }
+
+[features]
+extension-module = ["pyo3/extension-module"]

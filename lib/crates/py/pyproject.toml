@@ -1,0 +1,16 @@
+[build-system]
+requires = ["maturin>=1.15,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "ragworks"
+description = "Rust core for RAG infrastructure: chunking, indexing, fusion."
+requires-python = ">=3.10"
+classifiers = ["Programming Language :: Rust"]
+dynamic = ["version"]
+
+[tool.maturin]
+features = ["extension-module"]
+module-name = "ragworks"
+# strip = true breaks the dylib on macOS/arm64 with this toolchain
+# ("mis-aligned LINKEDIT string pool" at import). Leave symbols in.
