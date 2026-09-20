@@ -26,7 +26,7 @@ separates the two things that get conflated:
 
 | Path | Contents |
 |---|---|
-| [`lib/`](lib) | Rust workspace: `core`, `chunk`, `index`, `embed`, `read`, `py` |
+| [`lib/`](lib) | Rust workspace: `core`, `net`, `chunk`, `index`, `embed`, `read`, `judge`, `py` |
 | [`r-d/`](r-d) | Research directory: harness, tasks, systems, findings |
 | [`CONFORMANCE.md`](CONFORMANCE.md) | Requirements R1–R47, derived from 20 published RAG systems |
 | [`r-d/CANDIDATES.md`](r-d/CANDIDATES.md) | Which systems are worth implementing, with cost and code-availability data |
@@ -58,6 +58,8 @@ scores.
 | Typed reranking beat dense alone | **+0.074 recall@5, p = 0.0001** |
 | Set-level sufficiency with abstention | risk 0.260 → **0.062**, AURC 0.186 → **0.040** |
 | Rust BM25 against the Python reference | 100% top-1 agreement, **21.7× faster search** |
+| Lexical reranking beat no reranking | +0.019 recall@5, **p = 0.55** — not at all |
+| Typed reranking beat the lexical baseline | **+0.104 recall@5, p = 0.0001** |
 
 The pattern: on this task the retrieval *mechanism* barely moved anything. The
 reranking and abstention layers moved a great deal.

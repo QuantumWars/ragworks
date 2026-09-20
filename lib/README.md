@@ -14,10 +14,12 @@ a registry in front of it, so pipelines are configuration rather than code.
 | `ragworks-chunk` | `fixed`, `recursive`, `markdown` |
 | `ragworks-index` | `bm25`, `flat` dense, RRF fusion |
 | `ragworks-embed` | `hashing` (offline), `openai` (any compatible endpoint), with retry, rate limiting and cost accounting |
+| `ragworks-net` | shared provider plumbing: HTTP seam, retry policy, rate limiting |
+| `ragworks-judge` | `lexical`/`jev` rerankers, `coverage`/`jev` verifiers |
 | `ragworks-read` | `text`, `markdown`, `html`, `csv`, `json`/`jsonl`, and `pdf` behind a feature; extension dispatch and directory ingestion |
-| `ragworks-py` | PyO3 bindings, abi3 wheel — `Corpus`, `Chunker`, `Bm25`, `Flat`, `Embedder`, `ingest`, `read_file`, `rrf`, `catalogue` |
+| `ragworks-py` | PyO3 bindings, abi3 wheel — `Corpus`, `Chunker`, `Bm25`, `Flat`, `Embedder`, `Reranker`, `Verifier`, `ingest`, `read_file`, `rrf`, `catalogue` |
 
-**101 tests, 0 clippy warnings.**
+**115 tests, 0 clippy warnings.**
 
 Against the Python BM25 in `r-d`, on 2,964 paragraphs and 300 queries:
 **100% top-1 agreement, 1.000 set overlap@10, 21.7× faster search, 3.2× faster

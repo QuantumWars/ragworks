@@ -366,6 +366,101 @@ impl Flat {
     }
 }
 
+// --------------------------------------------------------------- judging
+
+#[pyclass(module = "ragworks")]
+pub struct Reranker {
+    inner: Box<dyn ragworks_core::Reranker>,
+}
+
+#[pymethods]
+impl Reranker {
+    /// `name` is "lexical" (offline BM25 rescoring) or "jev" (typed model).
+    #[new]
+    #[pyo3(signature = (name, config = None))]
+    fn new(name: &str, config: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
+        let cfg = json(config)?;
+        Ok(Self {
+            inner: ragworks_judge::reranker_registry().build(name, &cfg).map_err(Error)?,
+        })
+    }
+
+    /// One score per candidate, in candidate order.
+    ///
+    /// The whole shortlist is scored in a single round trip, because every
+    /// question in a request is evaluated against the same state in parallel.
+    fn rerank(&self, py: Python<'_>, query: &str, candidates: Vec<String>) -> Result<Vec<f32>> {
+        py.detach(|| {
+            let refs: Vec<&str> = candidates.iter().map(String::as_str).collect();
+            let mut out = Vec::with_capacity(refs.len());
+            self.inner.rerank(query, &refs, &mut out)?;
+            Ok(out)
+        })
+    }
+
+    #[getter]
+    fn name(&self) -> &'static str {
+        self.inner.name()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("Reranker({:?})", self.inner.name())
+    }
+}
+
+#[pyclass(module = "ragworks")]
+pub struct Verifier {
+    inner: Box<dyn ragworks_core::Verifier>,
+}
+
+#[pymethods]
+impl Verifier {
+    /// `name` is "coverage" (offline term coverage) or "jev" (typed model).
+    #[new]
+    #[pyo3(signature = (name, config = None))]
+    fn new(name: &str, config: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
+        let cfg = json(config)?;
+        Ok(Self {
+            inner: ragworks_judge::verifier_registry().build(name, &cfg).map_err(Error)?,
+        })
+    }
+
+    /// Judge the evidence set as a whole.
+    ///
+    /// Returns `(support, confidence, window)` where support is
+    /// "supports", "refutes" or "insufficient". The window is the number of
+    /// items judged: a verdict without it is uninterpretable.
+    fn verify(
+        &self,
+        py: Python<'_>,
+        query: &str,
+        evidence: Vec<String>,
+    ) -> Result<(&'static str, f32, usize)> {
+        py.detach(|| {
+            let refs: Vec<&str> = evidence.iter().map(String::as_str).collect();
+            let v = self.inner.verify(query, &refs)?;
+            Ok((
+                match v.support {
+                    ragworks_core::Support::Supports => "supports",
+                    ragworks_core::Support::Refutes => "refutes",
+                    ragworks_core::Support::Insufficient => "insufficient",
+                },
+                v.confidence,
+                v.window,
+            ))
+        })
+    }
+
+    #[getter]
+    fn name(&self) -> &'static str {
+        self.inner.name()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("Verifier({:?})", self.inner.name())
+    }
+}
+
 // --------------------------------------------------------------- readers
 
 /// Read one file, dispatching on its extension. Returns `{"text", "meta"}`.
@@ -437,6 +532,8 @@ fn catalogue(py: Python<'_>) -> PyResult<Py<PyAny>> {
         "vector_store": ragworks_index::vector_registry().describe(),
         "embedder": ragworks_embed::registry().describe(),
         "reader": ragworks_read::registry().describe(),
+        "reranker": ragworks_judge::reranker_registry().describe(),
+        "verifier": ragworks_judge::verifier_registry().describe(),
     });
     let loads = py.import("json")?.getattr("loads")?;
     Ok(loads.call1((all.to_string(),))?.unbind())
@@ -451,6 +548,8 @@ fn ragworks(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Chunker>()?;
     m.add_class::<Bm25>()?;
     m.add_class::<Embedder>()?;
+    m.add_class::<Reranker>()?;
+    m.add_class::<Verifier>()?;
     m.add_class::<Flat>()?;
     m.add_function(wrap_pyfunction!(rrf, m)?)?;
     m.add_function(wrap_pyfunction!(read_file, m)?)?;
