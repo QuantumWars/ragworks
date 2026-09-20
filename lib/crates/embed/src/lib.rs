@@ -85,6 +85,53 @@ mod tests {
     }
 
     #[test]
+    fn morphological_variants_share_features() {
+        // Regression. Whole-token hashing scored every one of these pairs
+        // exactly 0.0, because the variants land in unrelated buckets. On
+        // HotpotQA that cost 0.204 recall@5 (p=0.0001).
+        let e = hashing(512);
+        for (a, b) in [("writing", "writes"), ("index", "indexes"), ("sorted", "sorting")] {
+            let s = cosine(&vec_of(&*e, a), &vec_of(&*e, b));
+            assert!(s > 0.25, "{a:?} vs {b:?} scored {s:.4}; n-grams are not being applied");
+        }
+    }
+
+    #[test]
+    fn unrelated_words_still_score_zero() {
+        // The other half of the fix: subwords must not make everything match.
+        let e = hashing(512);
+        let s = cosine(&vec_of(&*e, "volcano"), &vec_of(&*e, "database"));
+        assert!(s.abs() < 0.05, "unrelated words should not share features, got {s:.4}");
+    }
+
+    #[test]
+    fn disabling_ngrams_reproduces_whole_token_hashing() {
+        // The config is honest about what it does: an empty list restores the
+        // old behaviour exactly, including its failure.
+        let e = registry()
+            .build("hashing", &serde_json::json!({"dim": 512, "ngrams": []}))
+            .unwrap();
+        assert_eq!(cosine(&vec_of(&*e, "writing"), &vec_of(&*e, "writes")), 0.0);
+    }
+
+    #[test]
+    fn a_token_shorter_than_the_window_still_contributes() {
+        // "a" yields no 3-grams from "<a>", but must not vanish entirely.
+        let e = hashing(256);
+        assert!(vec_of(&*e, "a").iter().any(|v| *v != 0.0));
+    }
+
+    #[test]
+    fn invalid_ngram_settings_are_rejected_at_build_time() {
+        for bad in [
+            serde_json::json!({"dim": 64, "ngrams": [0]}),
+            serde_json::json!({"dim": 64, "token_weight": -1.0}),
+        ] {
+            assert!(registry().build("hashing", &bad).is_err(), "accepted {bad}");
+        }
+    }
+
+    #[test]
     fn an_empty_batch_and_empty_text_are_handled() {
         let e = hashing(32);
         let mut out = Vec::new();

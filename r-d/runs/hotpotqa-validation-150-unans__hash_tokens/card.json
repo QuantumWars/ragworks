@@ -1,0 +1,37 @@
+{
+  "system": "hash_tokens",
+  "task": "hotpotqa-validation-150-unans",
+  "n_docs": 1461,
+  "n_queries": 135,
+  "n_failed": 0,
+  "limit": null,
+  "rpm": 0.0,
+  "index_s": 0.04487916699144989,
+  "aggregate": {
+    "recall@1": 0.23333333333333334,
+    "recall@5": 0.4185185185185185,
+    "ndcg@10": 0.4459332057916517,
+    "mrr": 0.5622516166960612,
+    "hit@5": 0.6814814814814815
+  },
+  "cost": {
+    "usd": 0.0,
+    "tokens_in": 0.0,
+    "tokens_out": 0.0
+  },
+  "latency": {
+    "p50": 0.001287874998524785,
+    "p95": 0.0013846249785274267,
+    "p99": 0.0014567079779226333,
+    "mean": 0.0012965288932900877,
+    "index_s": 0.04487916699144989
+  },
+  "task_meta": {
+    "source": "hotpotqa/hotpot_qa:distractor",
+    "split": "validation",
+    "limit": 150,
+    "per_question_scope": false,
+    "n_unanswerable": 15,
+    "unanswerable_is_synthetic": true
+  }
+}

@@ -145,14 +145,18 @@ crates/embed/src/
   http.rs   transport seam, mockable in tests
 ```
 
-## A caveat worth repeating
+## The offline embedder
 
-The `hashing` embedder is for exercising a pipeline offline, never for judging
-retrieval quality. Measured on one worked example, asked *"why do indexes make
-writing slower?"*, it scored the semantically correct section **0.0000** because
-the query says "writing" and the text says "writes"; the learned embedder ranked
-that section second at 0.52. It has no notion of meaning and can rank a
-paraphrase below an unrelated passage.
+`hashing` hashes each token together with its character n-grams, so
+morphological variants share features. On HotpotQA that is worth **+0.204
+recall@5 (p=0.0001)** over whole-token hashing, reaching roughly 83% of a
+learned bi-encoder at no model cost. Details in
+[`r-d/findings/wave2_hashing.md`](../r-d/findings/wave2_hashing.md).
+
+It still has no notion of meaning: texts sharing no substrings score zero
+however related, and without a corpus there is no inverse document frequency to
+down-weight common features. Use it to exercise a pipeline offline, not to judge
+retrieval quality.
 
 `traits.rs` declares every swap point, including ones with no implementation
 yet, so the shape of the whole library is visible and checked by the compiler
