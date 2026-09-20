@@ -1,0 +1,14 @@
+[package]
+name = "ragworks-core"
+description = "Core types, zero-copy corpus store, and the plugin system."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+thiserror.workspace = true
+unicode-segmentation.workspace = true

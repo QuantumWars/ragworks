@@ -1,0 +1,29 @@
+[workspace]
+resolver = "3"
+members = ["crates/core", "crates/chunk", "crates/index", "crates/py"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+ragworks-core = { path = "crates/core" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+schemars = "1.2.2"
+thiserror = "2.0.20"
+rayon = "1.12.0"
+unicode-segmentation = "1.13.3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+# Keep line tables. Without them, the macOS/arm64 linker on this toolchain
+# emits a cdylib that dyld rejects at import with "mis-aligned LINKEDIT string
+# pool". Verified by bisection: debug builds load, every release build without
+# debug info fails, and -ld_classic does not help. Costs binary size and buys
+# correct panics; strip at packaging time if a release wheel needs to be small.
+debug = 1
