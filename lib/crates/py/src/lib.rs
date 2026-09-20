@@ -272,6 +272,57 @@ impl Bm25 {
     }
 }
 
+// ------------------------------------------------------------- embedder
+
+#[pyclass(module = "ragworks")]
+pub struct Embedder {
+    inner: Box<dyn ragworks_core::Embedder>,
+}
+
+#[pymethods]
+impl Embedder {
+    /// `name` is "hashing" (offline, deterministic) or "openai" (any
+    /// OpenAI-compatible `/embeddings` endpoint).
+    #[new]
+    #[pyo3(signature = (name, config = None))]
+    fn new(name: &str, config: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
+        let cfg = json(config)?;
+        Ok(Self { inner: ragworks_embed::registry().build(name, &cfg).map_err(Error)? })
+    }
+
+    /// Embed a batch. Returns `dim * len(texts)` floats, row-major.
+    ///
+    /// Batching, retry and rate limiting happen inside Rust, so a long run is
+    /// one crossing per provider batch rather than one per text.
+    fn embed(&self, py: Python<'_>, texts: Vec<String>) -> Result<Vec<f32>> {
+        py.detach(|| {
+            let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
+            let mut out = Vec::with_capacity(refs.len() * self.inner.dim());
+            self.inner.embed(&refs, &mut out)?;
+            Ok(out)
+        })
+    }
+
+    #[getter]
+    fn dim(&self) -> usize {
+        self.inner.dim()
+    }
+
+    #[getter]
+    fn max_batch(&self) -> usize {
+        self.inner.max_batch()
+    }
+
+    #[getter]
+    fn name(&self) -> &'static str {
+        self.inner.name()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("Embedder({:?}, dim={})", self.inner.name(), self.inner.dim())
+    }
+}
+
 // ---------------------------------------------------------------- dense
 
 #[pyclass(module = "ragworks")]
@@ -340,6 +391,7 @@ fn catalogue(py: Python<'_>) -> PyResult<Py<PyAny>> {
         "tokenizer": ragworks_core::tokenize::registry().describe(),
         "text_index": ragworks_index::text_registry().describe(),
         "vector_store": ragworks_index::vector_registry().describe(),
+        "embedder": ragworks_embed::registry().describe(),
     });
     let loads = py.import("json")?.getattr("loads")?;
     Ok(loads.call1((all.to_string(),))?.unbind())
@@ -353,6 +405,7 @@ fn ragworks(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Chunk>()?;
     m.add_class::<Chunker>()?;
     m.add_class::<Bm25>()?;
+    m.add_class::<Embedder>()?;
     m.add_class::<Flat>()?;
     m.add_function(wrap_pyfunction!(rrf, m)?)?;
     m.add_function(wrap_pyfunction!(catalogue, m)?)?;

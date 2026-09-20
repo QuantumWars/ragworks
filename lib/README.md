@@ -13,11 +13,11 @@ a registry in front of it, so pipelines are configuration rather than code.
 | `ragworks-core` | corpus, errors, plugin registry, tokenizers, swap-point traits |
 | `ragworks-chunk` | `fixed`, `recursive`, `markdown` |
 | `ragworks-index` | `bm25`, `flat` dense, RRF fusion |
-| `ragworks-py` | PyO3 bindings, abi3 wheel — `Corpus`, `Chunker`, `Bm25`, `Flat`, `rrf`, `catalogue` |
+| `ragworks-embed` | `hashing` (offline), `openai` (any compatible endpoint), with retry, rate limiting and cost accounting |
+| `ragworks-py` | PyO3 bindings, abi3 wheel — `Corpus`, `Chunker`, `Bm25`, `Flat`, `Embedder`, `rrf`, `catalogue` |
 | `ragworks-read` | not started |
-| `ragworks-embed` | not started |
 
-**54 tests, 0 clippy warnings.**
+**75 tests, 0 clippy warnings.**
 
 Against the Python BM25 in `r-d`, on 2,964 paragraphs and 300 queries:
 **100% top-1 agreement, 1.000 set overlap@10, 21.7× faster search, 3.2× faster
@@ -112,6 +112,15 @@ arrive and computes IDF per query term at search time, so `finish()` is a no-op
 and "indexed but not finished" cannot happen. Removing an invalid state beats
 guarding it.
 
+**API keys come from the environment, never from configuration.** An embedder
+config names the variable to read; configs get committed, pasted into issues and
+printed in logs, and keys must not travel with them.
+
+**Retry is driven by the error model, not by a catch-all.** `Error::is_retryable`
+distinguishes a rate limit from an authentication failure, so a 401 fails at once
+instead of consuming five attempts, and an unclassifiable error is not retried
+rather than looping forever.
+
 ## Layout
 
 ```
@@ -128,7 +137,22 @@ crates/index/src/
   bm25.rs   Okapi BM25 inverted index
   flat.rs   exact dense search, cosine or dot
   fuse.rs   reciprocal rank fusion
+crates/embed/src/
+  hash.rs   deterministic offline hashing embedder
+  openai.rs OpenAI-compatible HTTP embedder
+  retry.rs  backoff driven by error classification
+  limit.rs  client-side rate limiting
+  http.rs   transport seam, mockable in tests
 ```
+
+## A caveat worth repeating
+
+The `hashing` embedder is for exercising a pipeline offline, never for judging
+retrieval quality. Measured on one worked example, asked *"why do indexes make
+writing slower?"*, it scored the semantically correct section **0.0000** because
+the query says "writing" and the text says "writes"; the learned embedder ranked
+that section second at 0.52. It has no notion of meaning and can rank a
+paraphrase below an unrelated passage.
 
 `traits.rs` declares every swap point, including ones with no implementation
 yet, so the shape of the whole library is visible and checked by the compiler
