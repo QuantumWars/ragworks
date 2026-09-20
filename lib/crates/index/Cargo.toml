@@ -1,0 +1,16 @@
+[package]
+name = "ragworks-index"
+description = "Indexes: BM25 lexical, flat exact dense, and rank fusion."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+ragworks-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+
+[dev-dependencies]
+ragworks-chunk = { path = "../chunk" }
