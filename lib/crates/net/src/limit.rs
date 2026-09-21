@@ -7,9 +7,13 @@
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use ragworks_core::Result;
+
+use crate::http::HttpPost;
+
 #[derive(Debug)]
 pub struct RateLimiter {
-    interval: Duration,
+    pub(crate) interval: Duration,
     last: Mutex<Option<Instant>>,
 }
 
@@ -57,6 +61,36 @@ impl RateLimiter {
     }
 }
 
+/// Rate limiting as a transport layer.
+///
+/// This must sit **below** any cache. A limiter placed above one throttles
+/// responses that were served from disk and consumed no quota at all --
+/// measured here as a warm cache running at the rate limit rather than at disk
+/// speed, because the wait happened before the lookup.
+pub struct RateLimited {
+    inner: Box<dyn HttpPost>,
+    limiter: RateLimiter,
+}
+
+impl RateLimited {
+    pub fn new(inner: Box<dyn HttpPost>, rpm: f64) -> Self {
+        Self { inner, limiter: RateLimiter::per_minute(rpm) }
+    }
+}
+
+impl HttpPost for RateLimited {
+    fn post(&self, url: &str, headers: &[(&str, String)], body: &str) -> Result<(u16, String)> {
+        self.limiter.acquire(&|d| std::thread::sleep(d));
+        self.inner.post(url, headers, body)
+    }
+}
+
+impl std::fmt::Debug for RateLimited {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RateLimited").field("interval", &self.limiter.interval).finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -75,6 +109,33 @@ mod tests {
         // Reservations accumulate, so a burst is spread rather than collapsed.
         let third = l.reserve();
         assert!(third > second, "each reservation must queue behind the last");
+    }
+
+    #[test]
+    fn a_cache_hit_below_the_limiter_is_never_throttled() {
+        // The ordering bug this decorator exists to prevent: a limiter above a
+        // cache makes warm runs pay the rate limit for disk reads.
+        use crate::cache::CachedHttp;
+        use crate::http::MockHttp;
+
+        let dir = std::env::temp_dir().join(format!("ragworks_order_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+
+        // cache -> limiter -> transport. One request per minute would make any
+        // second network call take a minute; the cached one must not.
+        let limited = RateLimited::new(Box::new(MockHttp::ok("body")), 1.0);
+        let cached = CachedHttp::new(Box::new(limited), &dir).unwrap();
+
+        cached.post("u", &[], "b").unwrap();
+        let t = Instant::now();
+        cached.post("u", &[], "b").unwrap();
+        assert!(
+            t.elapsed() < Duration::from_millis(500),
+            "a cache hit waited {:?} for a quota it did not use",
+            t.elapsed()
+        );
+        assert_eq!(cached.stats.snapshot().0, 1);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

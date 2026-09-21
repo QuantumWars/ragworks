@@ -13,12 +13,10 @@
 //! abstention cut risk from 0.260 to 0.062, at roughly $0.09 per thousand
 //! queries.
 
-use std::time::Duration;
-
 use ragworks_core::{
     Component, Error, Reranker, Result, Support, Verdict, Verifier,
 };
-use ragworks_net::{HttpPost, RateLimiter, RetryPolicy, UreqClient};
+use ragworks_net::{HttpPost, RetryPolicy};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
@@ -41,6 +39,9 @@ pub struct JevConfig {
     pub requests_per_minute: f64,
     #[serde(default = "default_timeout")]
     pub timeout_secs: u64,
+    /// Cache namespace for successful responses. `null` disables caching.
+    #[serde(default = "default_cache")]
+    pub cache: Option<String>,
     #[serde(default)]
     pub retry: RetryPolicy,
 }
@@ -60,6 +61,9 @@ fn default_max_chars() -> usize {
 fn default_timeout() -> u64 {
     60
 }
+fn default_cache() -> Option<String> {
+    Some("jev".into())
+}
 
 impl Default for JevConfig {
     fn default() -> Self {
@@ -70,6 +74,7 @@ impl Default for JevConfig {
             max_chars: default_max_chars(),
             requests_per_minute: 0.0,
             timeout_secs: default_timeout(),
+            cache: default_cache(),
             retry: RetryPolicy::default(),
         }
     }
@@ -81,7 +86,6 @@ pub struct Jev {
     api_key: String,
     max_chars: usize,
     retry: RetryPolicy,
-    limiter: RateLimiter,
     http: Box<dyn HttpPost>,
 }
 
@@ -98,8 +102,12 @@ impl Component for Jev {
         "Schema-constrained judging; an out-of-schema verdict cannot occur.";
 
     fn build(config: Self::Config) -> Result<Self> {
-        let timeout = Duration::from_secs(config.timeout_secs);
-        Self::with_http(config, Box::new(UreqClient::new(timeout)))
+        let http = ragworks_net::transport(
+            config.timeout_secs,
+            config.cache.as_deref(),
+            config.requests_per_minute,
+        )?;
+        Self::with_http(config, http)
     }
 }
 
@@ -124,7 +132,6 @@ impl Jev {
             api_key,
             max_chars: config.max_chars,
             retry: config.retry,
-            limiter: RateLimiter::per_minute(config.requests_per_minute),
             http,
         })
     }
@@ -148,7 +155,6 @@ impl Jev {
         ];
 
         let raw = self.retry.run(&|d| std::thread::sleep(d), |_| {
-            self.limiter.acquire(&|d| std::thread::sleep(d));
             let (status, text) = self.http.post(&self.endpoint, &headers, &body)?;
             if (200..300).contains(&status) {
                 return Ok(text);

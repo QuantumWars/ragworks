@@ -8,13 +8,11 @@
 //! printed in logs; keys must not travel with them.
 
 use std::sync::Mutex;
-use std::time::Duration;
-
 use ragworks_core::{Component, Embedder, Error, Result};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
-use ragworks_net::{HttpPost, RateLimiter, RetryPolicy, UreqClient};
+use ragworks_net::{HttpPost, RetryPolicy};
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -36,6 +34,9 @@ pub struct OpenAiConfig {
     pub requests_per_minute: f64,
     #[serde(default = "default_timeout")]
     pub timeout_secs: u64,
+    /// Cache namespace for successful responses. `null` disables caching.
+    #[serde(default = "default_cache")]
+    pub cache: Option<String>,
     #[serde(default)]
     pub retry: RetryPolicy,
 }
@@ -55,6 +56,9 @@ fn default_rpm() -> f64 {
 fn default_timeout() -> u64 {
     60
 }
+fn default_cache() -> Option<String> {
+    Some("openai".into())
+}
 
 impl Default for OpenAiConfig {
     fn default() -> Self {
@@ -66,6 +70,7 @@ impl Default for OpenAiConfig {
             max_batch: default_max_batch(),
             requests_per_minute: default_rpm(),
             timeout_secs: default_timeout(),
+            cache: default_cache(),
             retry: RetryPolicy::default(),
         }
     }
@@ -86,7 +91,6 @@ pub struct OpenAiCompatible {
     api_key: String,
     max_batch: usize,
     retry: RetryPolicy,
-    limiter: RateLimiter,
     http: Box<dyn HttpPost>,
     usage: Mutex<Usage>,
 }
@@ -108,8 +112,12 @@ impl Component for OpenAiCompatible {
         "OpenAI-compatible /embeddings endpoint, with retry, rate limiting and cost accounting.";
 
     fn build(config: Self::Config) -> Result<Self> {
-        let timeout = Duration::from_secs(config.timeout_secs);
-        Self::with_http(config, Box::new(UreqClient::new(timeout)))
+        let http = ragworks_net::transport(
+            config.timeout_secs,
+            config.cache.as_deref(),
+            config.requests_per_minute,
+        )?;
+        Self::with_http(config, http)
     }
 }
 
@@ -142,7 +150,6 @@ impl OpenAiCompatible {
             api_key,
             max_batch: config.max_batch,
             retry: config.retry,
-            limiter: RateLimiter::per_minute(config.requests_per_minute),
             http,
             usage: Mutex::new(Usage::default()),
         })
@@ -202,7 +209,6 @@ impl OpenAiCompatible {
         ];
 
         let raw = self.retry.run(&|d| std::thread::sleep(d), |_| {
-            self.limiter.acquire(&|d| std::thread::sleep(d));
             let (status, text) = self.http.post(&self.endpoint, &headers, &body)?;
             if (200..300).contains(&status) {
                 return Ok(text);

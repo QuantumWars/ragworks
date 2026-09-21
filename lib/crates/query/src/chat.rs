@@ -8,10 +8,8 @@
 //! Lives here rather than in a shared crate because it has exactly one consumer
 //! so far. It moves when a second appears, the way the HTTP plumbing did.
 
-use std::time::Duration;
-
 use ragworks_core::{Error, Result};
-use ragworks_net::{HttpPost, RateLimiter, RetryPolicy, UreqClient};
+use ragworks_net::{HttpPost, RetryPolicy};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
@@ -44,6 +42,9 @@ pub struct ChatConfig {
     pub requests_per_minute: f64,
     #[serde(default = "default_timeout")]
     pub timeout_secs: u64,
+    /// Cache namespace for successful responses. `null` disables caching.
+    #[serde(default = "default_cache")]
+    pub cache: Option<String>,
     #[serde(default)]
     pub retry: RetryPolicy,
 }
@@ -65,6 +66,9 @@ fn default_max_tokens() -> usize {
 fn default_timeout() -> u64 {
     90
 }
+fn default_cache() -> Option<String> {
+    Some("chat".into())
+}
 fn yes() -> bool {
     true
 }
@@ -80,6 +84,7 @@ impl Default for ChatConfig {
             disable_reasoning: yes(),
             requests_per_minute: 0.0,
             timeout_secs: default_timeout(),
+            cache: default_cache(),
             retry: RetryPolicy::default(),
         }
     }
@@ -93,7 +98,6 @@ pub struct Chat {
     temperature: f32,
     disable_reasoning: bool,
     retry: RetryPolicy,
-    limiter: RateLimiter,
     http: Box<dyn HttpPost>,
 }
 
@@ -105,8 +109,12 @@ impl std::fmt::Debug for Chat {
 
 impl Chat {
     pub fn new(config: ChatConfig) -> Result<Self> {
-        let timeout = Duration::from_secs(config.timeout_secs);
-        Self::with_http(config, Box::new(UreqClient::new(timeout)))
+        let http = ragworks_net::transport(
+            config.timeout_secs,
+            config.cache.as_deref(),
+            config.requests_per_minute,
+        )?;
+        Self::with_http(config, http)
     }
 
     pub fn with_http(config: ChatConfig, http: Box<dyn HttpPost>) -> Result<Self> {
@@ -131,7 +139,6 @@ impl Chat {
             temperature: config.temperature,
             disable_reasoning: config.disable_reasoning,
             retry: config.retry,
-            limiter: RateLimiter::per_minute(config.requests_per_minute),
             http,
         })
     }
@@ -156,7 +163,6 @@ impl Chat {
         ];
 
         let raw = self.retry.run(&|d| std::thread::sleep(d), |_| {
-            self.limiter.acquire(&|d| std::thread::sleep(d));
             let (status, text) = self.http.post(&self.endpoint, &headers, &body)?;
             if (200..300).contains(&status) {
                 return Ok(text);

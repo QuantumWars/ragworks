@@ -131,15 +131,25 @@ Until that exists, the honest summary of this project's performance is section 1
 Highest value first. The first three are worth more than everything below them
 combined, because of section 3.
 
-1. **Parallelize `search_many`** — `crates/py/src/lib.rs`. It releases the GIL
-   and then loops serially. `rayon` is already a workspace dependency and is
-   **used by no crate**; this is its first real job.
-2. **Make provider calls concurrent and bounded** — `crates/embed/src/openai.rs`,
-   `crates/query/src/chat.rs`, `crates/judge/src/jev.rs`. Batches go one at a
-   time through blocking `ureq`, with blocking sleeps for retry and rate limit.
-3. **Persistent response caching**, content-addressed on (model, prompt,
-   params). Re-running an evaluation after a metric change should cost nothing.
-   This is the single largest cost saver available and does not exist yet.
+> **Ordering corrected 2026-09-22.** This list originally put
+> "parallelize `search_many`" first. That contradicted section 3: BM25 search
+> has a p95 of 0.15 ms, so parallelizing it saves nothing an LLM stage does not
+> immediately dwarf. Caching and provider concurrency are the real first two.
+
+1. **~~Persistent response caching~~ — DONE.** `crates/net/src/cache.rs`
+   decorates the `HttpPost` seam, so embedders, judges and query transforms all
+   gained it with no change to any of them. Measured: median per-query latency
+   **1520 ms cold, 7 ms warm**. Keys exclude headers, so no token reaches disk;
+   failures are never cached.
+2. **Make provider calls concurrent and bounded** — `crates/embed/src/openai.rs`
+   sends batches one at a time through blocking `ureq`. The bigger win is
+   caller-level: `r-d` loops over queries serially, and at 614 ms to 4.3 s per
+   query that is where the wall clock goes. Bound the concurrency so the rate
+   limiter still means something.
+3. **Parallelize `search_many`** — `crates/py/src/lib.rs` releases the GIL and
+   then loops serially. `rayon` is a workspace dependency **used by no crate**.
+   Worth doing for correctness of the claim, but by section 3 it is cosmetic:
+   do not let it displace items 1 and 2.
 4. **BM25 query accumulation** — replace the per-query `HashMap` with a dense
    score buffer plus a touched-document list (`crates/index/src/bm25.rs`).
 5. **Remove the per-token `String` clone** — `bm25.rs:140` clones on every
@@ -160,7 +170,12 @@ combined, because of section 3.
 ## 6. Known gaps, recorded so they are decisions
 
 No persistent index, incremental commit, recovery, deletion/update model,
-compressed postings, stage-output cache, or content-addressed artifact store.
+compressed postings, or content-addressed artifact store. Provider responses
+*are* cached (section 5); stage outputs are not.
+
+There are still **no micro-benchmarks**. `criterion` is now a workspace
+dependency with no `benches/` using it, so no retrieval change can currently be
+justified with a before/after.
 BM25 has no stemming, stop-word handling or language-aware analysis, and both
 indexing and batch search are single-threaded.
 
