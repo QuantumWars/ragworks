@@ -26,7 +26,7 @@ separates the two things that get conflated:
 
 | Path | Contents |
 |---|---|
-| [`lib/`](lib) | Rust workspace: `core`, `net`, `chunk`, `index`, `embed`, `read`, `judge`, `py` |
+| [`lib/`](lib) | Rust workspace: `core`, `net`, `chunk`, `index`, `embed`, `read`, `query`, `judge`, `py` |
 | [`r-d/`](r-d) | Research directory: harness, tasks, systems, findings |
 | [`CONFORMANCE.md`](CONFORMANCE.md) | Requirements R1–R47, derived from 20 published RAG systems |
 | [`r-d/CANDIDATES.md`](r-d/CANDIDATES.md) | Which systems are worth implementing, with cost and code-availability data |
@@ -60,9 +60,12 @@ scores.
 | Rust BM25 against the Python reference | 100% top-1 agreement, **21.7× faster search** |
 | Lexical reranking beat no reranking | +0.019 recall@5, **p = 0.55** — not at all |
 | Typed reranking beat the lexical baseline | **+0.104 recall@5, p = 0.0001** |
+| Best of five query transforms beat the plain query | +0.004 recall@5, **p = 1.00** — not at all |
+| Query decomposition | **−0.052 recall@1, p = 0.0019** — significantly worse |
 
-The pattern: on this task the retrieval *mechanism* barely moved anything. The
-reranking and abstention layers moved a great deal.
+The pattern, across four independent attempts: everything that manipulates the
+query or the ranking *lexically* produced nothing. The only interventions that
+moved anything read the text and judged it.
 
 ## Principles
 

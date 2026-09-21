@@ -16,8 +16,9 @@ a registry in front of it, so pipelines are configuration rather than code.
 | `ragworks-embed` | `hashing` (offline), `openai` (any compatible endpoint), with retry, rate limiting and cost accounting |
 | `ragworks-net` | shared provider plumbing: HTTP seam, retry policy, rate limiting |
 | `ragworks-judge` | `lexical`/`jev` rerankers, `coverage`/`jev` verifiers |
+| `ragworks-query` | query transforms: `identity`, `rm3`, `multi_query`, `hyde`, `decompose` |
 | `ragworks-read` | `text`, `markdown`, `html`, `csv`, `json`/`jsonl`, and `pdf` behind a feature; extension dispatch and directory ingestion |
-| `ragworks-py` | PyO3 bindings, abi3 wheel — `Corpus`, `Chunker`, `Bm25`, `Flat`, `Embedder`, `Reranker`, `Verifier`, `ingest`, `read_file`, `rrf`, `catalogue` |
+| `ragworks-py` | PyO3 bindings, abi3 wheel — `Corpus`, `Chunker`, `Bm25`, `Flat`, `Embedder`, `QueryTransform`, `Reranker`, `Verifier`, `ingest`, `read_file`, `rrf`, `catalogue` |
 
 **115 tests, 0 clippy warnings.**
 
@@ -149,7 +150,31 @@ crates/read/src/
   text.rs markdown.rs html.rs tabular.rs json.rs
   pdf.rs    behind the `pdf` feature
   lib.rs    extension dispatch and directory ingestion
+crates/query/src/
+  offline.rs identity and RM3 relevance feedback
+  llm.rs     paraphrase, hypothetical document, decomposition
+  chat.rs    chat client with a model fallback chain
 ```
+
+## Why query transforms exist
+
+Retrieval fails two ways and reranking only fixes one. If the right document is
+in the shortlist but badly ordered, a reranker fixes it. If it is not in the
+shortlist at all, nothing downstream helps.
+
+Wave-1 measurement on multi-hop questions: the first supporting document came
+back at rank 0, the second at **rank 88**. No reranker reaches rank 88 from a
+shortlist of ten, because the second hop is not similar to the question — it is
+similar to something only the first hop reveals.
+
+A transform returning several queries means *retrieve for each and fuse*. One
+declaring `uses_feedback` gets a first retrieval pass to read before rewriting,
+so relevance feedback and zero-shot rewriting share one interface.
+
+**Reasoning is disabled by default** on chat calls. Measured on 2026-09-21, one
+free model spent 414 reasoning tokens against a 400-token budget and returned an
+empty completion; disabling it was 2.6x faster on a model that did work and used
+a tenth of the tokens. Rewriting a query does not benefit from deliberation.
 
 ## Reading a directory
 

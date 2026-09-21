@@ -16,6 +16,6 @@ pub use error::{Error, ProviderFault, Result};
 pub use plugin::{Component, PluginSpec, Registry};
 pub use tokenize::{TokenSpan, Tokenizer};
 pub use traits::{
-    Chunker, Embedder, Extracted, Hit, Reader, Reranker, Support, TextIndex, VectorStore, Verdict,
-    Verifier,
+    Chunker, Embedder, Extracted, Hit, QueryTransform, Reader, Reranker, Support, TextIndex,
+    VectorStore, Verdict, Verifier,
 };

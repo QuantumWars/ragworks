@@ -366,6 +366,59 @@ impl Flat {
     }
 }
 
+// --------------------------------------------------------------- queries
+
+#[pyclass(module = "ragworks")]
+pub struct QueryTransform {
+    inner: Box<dyn ragworks_core::QueryTransform>,
+}
+
+#[pymethods]
+impl QueryTransform {
+    /// `name` is "identity", "rm3", "multi_query", "hyde" or "decompose".
+    #[new]
+    #[pyo3(signature = (name, config = None))]
+    fn new(name: &str, config: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
+        let cfg = json(config)?;
+        Ok(Self { inner: ragworks_query::registry().build(name, &cfg).map_err(Error)? })
+    }
+
+    /// The queries to actually run.
+    ///
+    /// More than one means retrieve for each and fuse the runs. `feedback` is
+    /// text retrieved by an earlier pass; transforms that ignore it say so
+    /// through `uses_feedback`.
+    #[pyo3(signature = (query, feedback = None))]
+    fn transform(
+        &self,
+        py: Python<'_>,
+        query: &str,
+        feedback: Option<Vec<String>>,
+    ) -> Result<Vec<String>> {
+        let fb = feedback.unwrap_or_default();
+        py.detach(|| {
+            let refs: Vec<&str> = fb.iter().map(String::as_str).collect();
+            let mut out = Vec::new();
+            self.inner.transform(query, &refs, &mut out)?;
+            Ok(out)
+        })
+    }
+
+    #[getter]
+    fn uses_feedback(&self) -> bool {
+        self.inner.uses_feedback()
+    }
+
+    #[getter]
+    fn name(&self) -> &'static str {
+        self.inner.name()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("QueryTransform({:?})", self.inner.name())
+    }
+}
+
 // --------------------------------------------------------------- judging
 
 #[pyclass(module = "ragworks")]
@@ -534,6 +587,7 @@ fn catalogue(py: Python<'_>) -> PyResult<Py<PyAny>> {
         "reader": ragworks_read::registry().describe(),
         "reranker": ragworks_judge::reranker_registry().describe(),
         "verifier": ragworks_judge::verifier_registry().describe(),
+        "query_transform": ragworks_query::registry().describe(),
     });
     let loads = py.import("json")?.getattr("loads")?;
     Ok(loads.call1((all.to_string(),))?.unbind())
@@ -548,6 +602,7 @@ fn ragworks(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Chunker>()?;
     m.add_class::<Bm25>()?;
     m.add_class::<Embedder>()?;
+    m.add_class::<QueryTransform>()?;
     m.add_class::<Reranker>()?;
     m.add_class::<Verifier>()?;
     m.add_class::<Flat>()?;

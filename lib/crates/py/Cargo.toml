@@ -16,6 +16,7 @@ ragworks-chunk = { path = "../chunk" }
 ragworks-embed = { path = "../embed" }
 ragworks-index = { path = "../index" }
 ragworks-judge = { path = "../judge" }
+ragworks-query = { path = "../query" }
 # PDF is on for the Python wheel: it is pure Rust, so it costs binary size but
 # no system dependency, and a Python RAG user expects PDFs to work.
 ragworks-read = { path = "../read", features = ["pdf"] }

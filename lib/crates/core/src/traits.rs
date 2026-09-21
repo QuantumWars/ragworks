@@ -114,6 +114,44 @@ pub trait VectorStore: Send + Sync {
     fn search(&self, query: &[f32], k: usize, out: &mut Vec<Hit>) -> Result<()>;
 }
 
+/// Rewrite a query before retrieval runs.
+///
+/// One signature covers transforms that need nothing but the query
+/// (paraphrasing, hypothetical documents, decomposition) and those that need a
+/// first retrieval pass (relevance feedback, next-hop questions). The
+/// difference is whether `feedback` is used, which [`QueryTransform::uses_feedback`]
+/// declares so a pipeline does not pay for a pass nothing will read.
+///
+/// Returning several queries means *run all of them and fuse the runs*. That is
+/// the mechanism behind multi-query retrieval and decomposition, and it is why
+/// the output is a list rather than a string.
+///
+/// Motivation from this repository's wave-1 measurement: on multi-hop
+/// questions the first supporting document was retrieved at rank 0 and the
+/// second at rank 88. No reranker reaches rank 88 from a shortlist of ten. The
+/// second hop is not similar to the question -- it is similar to something only
+/// the first hop reveals -- so the query itself has to change.
+pub trait QueryTransform: Send + Sync {
+    fn name(&self) -> &'static str;
+
+    /// Append the queries to actually run. `out` is not cleared.
+    ///
+    /// `feedback` is text retrieved by an earlier pass, empty on the first.
+    fn transform(&self, query: &str, feedback: &[&str], out: &mut Vec<String>) -> Result<()>;
+
+    /// Whether `feedback` changes the output.
+    fn uses_feedback(&self) -> bool {
+        false
+    }
+
+    /// Convenience for one-off use and tests.
+    fn transform_one(&self, query: &str) -> Result<Vec<String>> {
+        let mut out = Vec::new();
+        self.transform(query, &[], &mut out)?;
+        Ok(out)
+    }
+}
+
 /// Reorder candidates for a query.
 ///
 /// Wave-1 measurement: reranking moved recall@5 from 0.748 to 0.822

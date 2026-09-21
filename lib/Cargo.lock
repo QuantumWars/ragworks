@@ -999,7 +999,19 @@ dependencies = [
  "ragworks-embed",
  "ragworks-index",
  "ragworks-judge",
+ "ragworks-query",
  "ragworks-read",
+ "serde_json",
+]
+
+[[package]]
+name = "ragworks-query"
+version = "0.1.0"
+dependencies = [
+ "ragworks-core",
+ "ragworks-net",
+ "schemars",
+ "serde",
  "serde_json",
 ]
 
